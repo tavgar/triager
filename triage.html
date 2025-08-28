@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Triage Builder</title>
+  <style>
+    :root {
+      --bg: #0b1324;
+      --panel: #121a2d;
+      --panel-2: #0f1730;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #4f46e5;
+      --accent-2: #22c55e;
+      --danger: #ef4444;
+      --border: #23324f;
+      --chip: #1f2a44;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu,
+        Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji",
+        "Segoe UI Emoji";
+      color: var(--text);
+      background: linear-gradient(180deg, #0a1021, #0b1324 45%, #0b1324 100%);
+    }
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+    h1 {
+      margin: 0 0 16px;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .subtext { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.25);
+    }
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .row { display: flex; gap: 12px; align-items: center; }
+    .row.wrap { flex-wrap: wrap; }
+    .row + .row { margin-top: 10px; }
+    label { font-size: 13px; color: var(--muted); }
+    .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 160px; }
+    input[type="text"], input[type="email"], input[type="number"], textarea, select {
+      width: 100%;
+      background: #0b1225;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      outline: none;
+    }
+    textarea { min-height: 84px; resize: vertical; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: white;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #2a2aa8;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      transition: transform 0.06s ease, opacity 0.2s ease;
+      user-select: none;
+    }
+    .btn:hover { opacity: 0.95; }
+    .btn:active { transform: translateY(1px); }
+    .btn.secondary { background: #1e293b; border-color: #263245; color: var(--text); }
+    .btn.ghost { background: transparent; border-color: var(--border); color: var(--text); }
+    .btn.danger { background: var(--danger); border-color: #b91c1c; }
+    .btn.small { padding: 6px 10px; border-radius: 8px; font-size: 12px; }
+    .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .divider { height: 1px; background: var(--border); margin: 12px 0; }
+    .pill {
+      background: var(--chip);
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--muted);
+      display: inline-flex;
+      gap: 8px; align-items: center;
+    }
+    .toggle { display: inline-flex; align-items: center; gap: 8px; }
+    .toggle input { width: 18px; height: 18px; }
+    .list {
+      display: flex; flex-direction: column; gap: 8px; margin-top: 8px;
+    }
+    .list-item { display: flex; gap: 8px; align-items: center; }
+    .list-item .grow { flex: 1; }
+    .list-item .truthy { display: inline-flex; align-items: center; gap: 6px; padding-left: 6px; }
+    .ip-card { position: relative; }
+    .ip-card .ip-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .ip-badge { font-weight: 700; font-size: 14px; }
+    .muted { color: var(--muted); }
+    pre#output { width: 100%; background: #0a1122; border: 1px solid var(--border); color: var(--text); padding: 12px; border-radius: 8px; min-height: 180px; white-space: pre-wrap; word-wrap: break-word; }
+    .copy-toast { font-size: 12px; color: var(--accent-2); opacity: 0; transition: opacity 0.2s ease; }
+    .copy-toast.show { opacity: 1; }
+  </style>
+  <script>
+    function uid() { return Math.random().toString(36).slice(2, 9); }
+    function createInput(placeholder = "", type = "text") {
+      const input = document.createElement('input');
+      input.type = type;
+      input.placeholder = placeholder;
+      return input;
+    }
+
+    function makeListItem({ withToggle = false, toggleLabel = "", placeholder = "" } = {}) {
+      const item = document.createElement('div');
+      item.className = 'list-item';
+      const text = createInput(placeholder, 'text');
+      text.className = 'grow';
+      item.appendChild(text);
+      if (withToggle) {
+        const truthy = document.createElement('label');
+        truthy.className = 'truthy muted';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        truthy.appendChild(cb);
+        truthy.appendChild(document.createTextNode(toggleLabel));
+        item.appendChild(truthy);
+      }
+      const remove = document.createElement('button');
+      remove.className = 'btn small ghost';
+      remove.type = 'button';
+      remove.textContent = 'Remove';
+      remove.addEventListener('click', () => item.remove());
+      item.appendChild(remove);
+      return item;
+    }
+
+    function addMfaMethod(container) {
+      const list = container.querySelector('.mfa-methods');
+      list.appendChild(makeListItem({ placeholder: 'MFA method (e.g., TOTP, SMS, Push)' }));
+    }
+
+    function addAuthMethod(container) {
+      const list = container.querySelector('.auth-methods');
+      list.appendChild(makeListItem({ withToggle: true, toggleLabel: 'true', placeholder: 'Auth method (e.g., Password, SSO, Token)' }));
+    }
+
+    function addAppUsed(container) {
+      const list = container.querySelector('.apps-used');
+      const item = document.createElement('div');
+      item.className = 'list-item';
+      const name = createInput('App name');
+      name.className = 'grow';
+      const seenWrap = document.createElement('label');
+      seenWrap.className = 'truthy muted';
+      const seen = document.createElement('input');
+      seen.type = 'checkbox';
+      seenWrap.appendChild(seen);
+      seenWrap.appendChild(document.createTextNode('seen'));
+      const when = createInput('when (optional)');
+      when.style.minWidth = '180px';
+      when.style.display = 'none';
+      seen.addEventListener('change', () => {
+        when.style.display = seen.checked ? 'inline-block' : 'none';
+      });
+      const remove = document.createElement('button');
+      remove.className = 'btn small ghost';
+      remove.type = 'button';
+      remove.textContent = 'Remove';
+      remove.addEventListener('click', () => item.remove());
+      item.appendChild(name);
+      item.appendChild(seenWrap);
+      item.appendChild(when);
+      item.appendChild(remove);
+      list.appendChild(item);
+    }
+
+    function makeIpCard(idx) {
+      const card = document.createElement('div');
+      card.className = 'card ip-card';
+      card.dataset.index = idx;
+
+      const header = document.createElement('div');
+      header.className = 'ip-header';
+      const left = document.createElement('div');
+      const badge = document.createElement('div');
+      badge.className = 'ip-badge';
+      badge.textContent = `IP ${idx}`;
+      left.appendChild(badge);
+      header.appendChild(left);
+      const actions = document.createElement('div');
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn small danger';
+      removeBtn.type = 'button';
+      removeBtn.textContent = 'Remove IP';
+      removeBtn.addEventListener('click', () => {
+        card.remove();
+        renumberIpCards();
+      });
+      actions.appendChild(removeBtn);
+      header.appendChild(actions);
+      card.appendChild(header);
+
+      const row1 = document.createElement('div');
+      row1.className = 'row';
+      const fIp = document.createElement('div'); fIp.className = 'field';
+      const lIp = document.createElement('label'); lIp.textContent = 'IP address';
+      const iIp = createInput('e.g., 203.0.113.42');
+      fIp.appendChild(lIp); fIp.appendChild(iIp);
+      const fCc = document.createElement('div'); fCc.className = 'field';
+      const lCc = document.createElement('label'); lCc.textContent = 'Country code';
+      const iCc = createInput('e.g., US');
+      fCc.appendChild(lCc); fCc.appendChild(iCc);
+      row1.appendChild(fIp); row1.appendChild(fCc);
+      card.appendChild(row1);
+
+      const rowOwner = document.createElement('div');
+      rowOwner.className = 'row';
+      const fOwner = document.createElement('div'); fOwner.className = 'field';
+      const lOwner = document.createElement('label'); lOwner.textContent = 'Owned by';
+      const iOwner = createInput('e.g., ISP/User/Company');
+      fOwner.appendChild(lOwner); fOwner.appendChild(iOwner);
+      rowOwner.appendChild(fOwner);
+      card.appendChild(rowOwner);
+
+      const mfaRow = document.createElement('div');
+      mfaRow.className = 'row wrap';
+      const mfaField = document.createElement('div'); mfaField.className = 'field';
+      const mfaLabel = document.createElement('label'); mfaLabel.textContent = 'MFA status';
+      const mfaOptions = document.createElement('div'); mfaOptions.className = 'row';
+      const statuses = [ ['VALID','valid'], ['NO MFA','no_mfa'], ['NOT VALID','not_valid'] ];
+      statuses.forEach(([label, value]) => {
+        const wrap = document.createElement('label'); wrap.className = 'toggle muted';
+        const rb = document.createElement('input'); rb.type = 'radio'; rb.name = `mfa-${idx}-${uid()}`; rb.value = value;
+        if (value === 'no_mfa') rb.checked = true;
+        wrap.appendChild(rb); wrap.appendChild(document.createTextNode(label));
+        mfaOptions.appendChild(wrap);
+      });
+      mfaField.appendChild(mfaLabel); mfaField.appendChild(mfaOptions);
+      mfaRow.appendChild(mfaField);
+
+      const mfaMethodsField = document.createElement('div'); mfaMethodsField.className = 'field';
+      const mfaMethodsLabel = document.createElement('label'); mfaMethodsLabel.textContent = 'MFA methods (free text, add more if needed)';
+      const mfaMethodsList = document.createElement('div'); mfaMethodsList.className = 'list mfa-methods';
+      const mfaAdd = document.createElement('button'); mfaAdd.type = 'button'; mfaAdd.className = 'btn small secondary'; mfaAdd.textContent = 'Add MFA method';
+      mfaAdd.addEventListener('click', () => addMfaMethod(card));
+      mfaMethodsField.appendChild(mfaMethodsLabel);
+      mfaMethodsField.appendChild(mfaMethodsList);
+      mfaMethodsField.appendChild(mfaAdd);
+      mfaRow.appendChild(mfaMethodsField);
+      card.appendChild(mfaRow);
+
+      // VPN + history
+      const vpnRow = document.createElement('div'); vpnRow.className = 'row wrap';
+      const vpnToggleWrap = document.createElement('label'); vpnToggleWrap.className = 'toggle muted';
+      const vpnCb = document.createElement('input'); vpnCb.type = 'checkbox';
+      vpnToggleWrap.appendChild(vpnCb); vpnToggleWrap.appendChild(document.createTextNode('VPN used'));
+      vpnRow.appendChild(vpnToggleWrap);
+      const vpnHistWrap = document.createElement('div'); vpnHistWrap.className = 'row'; vpnHistWrap.style.display = 'none';
+      const vpnHistToggle = document.createElement('label'); vpnHistToggle.className = 'toggle muted';
+      const vpnHistCb = document.createElement('input'); vpnHistCb.type = 'checkbox';
+      vpnHistToggle.appendChild(vpnHistCb); vpnHistToggle.appendChild(document.createTextNode('Has VPN usage history'));
+      const vpnHistDetail = createInput('History details (optional)');
+      vpnHistDetail.style.minWidth = '260px';
+      vpnHistWrap.appendChild(vpnHistToggle); vpnHistWrap.appendChild(vpnHistDetail);
+      vpnRow.appendChild(vpnHistWrap);
+      vpnCb.addEventListener('change', () => {
+        vpnHistWrap.style.display = vpnCb.checked ? 'flex' : 'none';
+      });
+      card.appendChild(vpnRow);
+
+      // Abuse
+      const abuseRow = document.createElement('div'); abuseRow.className = 'row';
+      const abuseToggle = document.createElement('label'); abuseToggle.className = 'toggle muted';
+      const abuseCb = document.createElement('input'); abuseCb.type = 'checkbox';
+      abuseToggle.appendChild(abuseCb); abuseToggle.appendChild(document.createTextNode('Abuse detected'));
+      const abuseWhenField = createInput('when (optional)');
+      abuseWhenField.style.display = 'none';
+      abuseWhenField.style.minWidth = '220px';
+      abuseCb.addEventListener('change', () => {
+        abuseWhenField.style.display = abuseCb.checked ? 'inline-block' : 'none';
+      });
+      abuseRow.appendChild(abuseToggle); abuseRow.appendChild(abuseWhenField);
+      card.appendChild(abuseRow);
+
+      // Auth methods list
+      const authCard = document.createElement('div'); authCard.className = 'card';
+      const authTitle = document.createElement('h3'); authTitle.textContent = 'Auth methods'; authTitle.style.margin = '0 0 8px'; authTitle.style.fontSize='14px';
+      const authList = document.createElement('div'); authList.className = 'list auth-methods';
+      const authAdd = document.createElement('button'); authAdd.type='button'; authAdd.className = 'btn small secondary'; authAdd.textContent = 'Add Auth method';
+      authAdd.addEventListener('click', () => addAuthMethod(card));
+      authCard.appendChild(authTitle); authCard.appendChild(authList); authCard.appendChild(authAdd);
+      card.appendChild(authCard);
+
+      // Result type, Browser, OS
+      const rowRes = document.createElement('div'); rowRes.className = 'row';
+      const fRes = document.createElement('div'); fRes.className = 'field';
+      const lRes = document.createElement('label'); lRes.textContent = 'result Type';
+      const iRes = createInput('e.g., 0 or custom'); iRes.value = '0';
+      fRes.appendChild(lRes); fRes.appendChild(iRes);
+      const fBr = document.createElement('div'); fBr.className = 'field';
+      const lBr = document.createElement('label'); lBr.textContent = 'Browser (free text)';
+      const brRow = document.createElement('div'); brRow.className = 'row';
+      const iBr = createInput('e.g., Chrome 124');
+      const brSeenWrap = document.createElement('label'); brSeenWrap.className = 'toggle muted';
+      const brSeen = document.createElement('input'); brSeen.type = 'checkbox';
+      brSeenWrap.appendChild(brSeen); brSeenWrap.appendChild(document.createTextNode('seen'));
+      brRow.appendChild(iBr); brRow.appendChild(brSeenWrap);
+      fBr.appendChild(lBr); fBr.appendChild(brRow);
+      const fOs = document.createElement('div'); fOs.className = 'field';
+      const lOs = document.createElement('label'); lOs.textContent = 'OS (free text)';
+      const osRow = document.createElement('div'); osRow.className = 'row';
+      const iOs = createInput('e.g., Windows 11');
+      const osSeenWrap = document.createElement('label'); osSeenWrap.className = 'toggle muted';
+      const osSeen = document.createElement('input'); osSeen.type = 'checkbox';
+      osSeenWrap.appendChild(osSeen); osSeenWrap.appendChild(document.createTextNode('seen'));
+      osRow.appendChild(iOs); osRow.appendChild(osSeenWrap);
+      fOs.appendChild(lOs); fOs.appendChild(osRow);
+      rowRes.appendChild(fRes); rowRes.appendChild(fBr); rowRes.appendChild(fOs);
+      card.appendChild(rowRes);
+
+      // Apps used
+      const appsCard = document.createElement('div'); appsCard.className = 'card';
+      const appsTitle = document.createElement('h3'); appsTitle.textContent = 'APP used'; appsTitle.style.margin = '0 0 8px'; appsTitle.style.fontSize='14px';
+      const appsList = document.createElement('div'); appsList.className = 'list apps-used';
+      const appsAdd = document.createElement('button'); appsAdd.type='button'; appsAdd.className = 'btn small secondary'; appsAdd.textContent = 'Add App';
+      appsAdd.addEventListener('click', () => addAppUsed(card));
+      appsCard.appendChild(appsTitle); appsCard.appendChild(appsList); appsCard.appendChild(appsAdd);
+      card.appendChild(appsCard);
+
+      // Attach references for generation
+      card._refs = { iIp, iCc, iOwner, mfaOptions, mfaMethodsList, vpnCb, vpnHistCb, vpnHistDetail, abuseCb, abuseWhenField, authList, iRes, iBr, brSeen, iOs, osSeen, appsList };
+      // Seed one row for MFA/Auth/Apps
+      addMfaMethod(card);
+      addAuthMethod(card);
+      addAppUsed(card);
+
+      return card;
+    }
+
+    function renumberIpCards() {
+      const cards = document.querySelectorAll('.ip-card');
+      cards.forEach((c, i) => {
+        c.dataset.index = String(i + 1);
+        const badge = c.querySelector('.ip-badge');
+        if (badge) badge.textContent = `IP ${i + 1}`;
+      });
+    }
+
+    function collectListTexts(list) {
+      return Array.from(list.querySelectorAll('.list-item')).map(item => {
+        const text = item.querySelector('input[type="text"]')?.value?.trim() || '';
+        const cb = item.querySelector('input[type="checkbox"]');
+        return { text, checked: !!(cb && cb.checked) };
+      }).filter(x => x.text || x.checked);
+    }
+
+    function generateOutput() {
+      const lines = [];
+      lines.push('[What happened]');
+      const what = document.getElementById('whatHappened').value.trim();
+      if (what) lines.push(what);
+
+      const userId = document.getElementById('userId').value.trim();
+      const userEmail = document.getElementById('userEmail').value.trim();
+      lines.push(`User: ${userId} / ${userEmail}`);
+
+      const anomalies = document.getElementById('anomaliesToggle').checked;
+      const anomalyNames = document.getElementById('anomalyNames').value.trim();
+      if (anomalies) {
+        lines.push(`- Logs: ${anomalyNames || 'anomalies'}`);
+      } else {
+        lines.push('- Logs: no anomalies');
+      }
+
+      const ipCards = Array.from(document.querySelectorAll('.ip-card'));
+      ipCards.forEach((card, idx) => {
+        const r = card._refs;
+        const label = ipCards.length > 1 ? `IP${idx + 1}:` : 'IP:';
+        const ip = r.iIp.value.trim();
+        const cc = r.iCc.value.trim();
+        const owner = r.iOwner.value.trim();
+        const selectedMfa = Array.from(r.mfaOptions.querySelectorAll('input[type="radio"]')).find(x => x.checked)?.value || 'no_mfa';
+        const mfaStatus = selectedMfa === 'valid' ? 'VALID' : selectedMfa === 'not_valid' ? 'NOT VALID' : 'NO MFA';
+        const mfaMethods = collectListTexts(r.mfaMethodsList).map(x => x.text).filter(Boolean);
+
+        lines.push(`${label} ${ip}${cc ? ' [' + cc + ']' : ''}`);
+        lines.push(`- Owned by ${owner}`);
+        lines.push(`- MFA: ${mfaStatus}${mfaMethods.length ? '; ' + mfaMethods.join(', ') : ''}`);
+
+        if (r.vpnCb.checked) {
+          lines.push('- VPN: YES');
+          if (r.vpnHistCb.checked) {
+            const detail = r.vpnHistDetail.value.trim();
+            lines.push(`- History of VPN usage${detail ? ': ' + detail : ''}`);
+          }
+        }
+
+        if (r.abuseCb.checked) {
+          const when = r.abuseWhenField.value.trim();
+          lines.push(`- abuse: Yes${when ? ' ; when: ' + when : ''}`);
+        }
+
+        const auths = collectListTexts(r.authList);
+        if (auths.length) {
+          lines.push('- [Auth methods]:');
+          auths.forEach(a => lines.push(`${a.text} ${a.checked ? 'true' : 'false'}`));
+        }
+
+        const resultType = r.iRes.value.trim();
+        lines.push(`- result Type: ${resultType || '0'}`);
+
+        const browser = r.iBr.value.trim();
+        const brSeen = r.brSeen.checked ? 'seen' : 'no seen';
+        lines.push(`- Browser: ${browser} ${brSeen}`);
+
+        const os = r.iOs.value.trim();
+        const osSeen = r.osSeen.checked ? 'seen' : 'no seen';
+        lines.push(`- OS: ${os} ${osSeen}`);
+
+        const apps = Array.from(r.appsList.querySelectorAll('.list-item')).map(item => {
+          const name = item.querySelector('input[type="text"]').value.trim();
+          const seen = item.querySelector('input[type="checkbox"]').checked;
+          const whens = Array.from(item.querySelectorAll('input[type="text"]')).map(x => x.value.trim());
+          // first text is name, second (if exists) is when
+          const when = whens.length > 1 ? whens[1] : '';
+          return { name, seen, when };
+        }).filter(a => a.name || a.seen || a.when);
+        if (apps.length) {
+          lines.push('- APP used:');
+          apps.forEach(a => {
+            lines.push(`${a.name} ${a.seen ? 'seen' : 'no seen'}${a.seen && a.when ? ' , when: ' + a.when : ''}`);
+          });
+        }
+      });
+
+      const conclusion = document.getElementById('conclusion').value.trim();
+      if (conclusion) {
+        lines.push('');
+        lines.push('[CONCOLUSION]');
+        lines.push(conclusion);
+      }
+
+      const threat = document.querySelector('input[name="threat"]:checked')?.value || 'no';
+      lines.push('');
+      lines.push(threat === 'yes' ? '[THREAT, T2 PLEASE INVISTIGATE]' : 'NO threat.');
+
+      document.getElementById('output').textContent = lines.join('\n');
+    }
+
+    function copyOutput() {
+      const text = document.getElementById('output').textContent;
+      if (!text.trim()) return;
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById('copyToast');
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 1200);
+      });
+    }
+
+    function addIp() {
+      const wrap = document.getElementById('ipWrap');
+      wrap.appendChild(makeIpCard(wrap.children.length + 1));
+      renumberIpCards();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('addIpBtn').addEventListener('click', addIp);
+      document.getElementById('genBtn').addEventListener('click', generateOutput);
+      document.getElementById('copyBtn').addEventListener('click', copyOutput);
+      document.getElementById('anomaliesToggle').addEventListener('change', (e) => {
+        document.getElementById('anomalyNames').style.display = e.target.checked ? 'block' : 'none';
+      });
+      // seed one IP card
+      addIp();
+    });
+  </script>
+  <!--
+    Notes:
+    - MFA methods are free-text, multiple can be added.
+    - Browser/OS are free-text with a Seen toggle.
+    - "abuse" is omitted unless detected.
+    - VPN line only appears if checked. History line appears if history is checked.
+  -->
+</head>
+<body>
+  <div class="container">
+    <h1>Triage Builder</h1>
+    <div class="subtext">Fill the form, then Generate and Copy the triage. Add multiple IP entities as needed.</div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Overview</h2>
+        <div class="field">
+          <label>What happened</label>
+          <textarea id="whatHappened" placeholder="Summarize the incident context and actions..."></textarea>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>User ID</label>
+            <input type="text" id="userId" placeholder="e.g., 12345" />
+          </div>
+          <div class="field">
+            <label>User Email</label>
+            <input type="email" id="userEmail" placeholder="e.g., user@example.com" />
+          </div>
+        </div>
+        <div class="row">
+          <label class="toggle muted"><input id="anomaliesToggle" type="checkbox" /> Anomalies present</label>
+        </div>
+        <div class="field" id="anomalyNames" style="display:none; margin-top:6px;">
+          <label>List anomalies (free text)</label>
+          <input type="text" placeholder="e.g., Impossible travel; Multiple failed MFA" />
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Output</h2>
+        <div class="toolbar" style="margin-bottom:10px;">
+          <button class="btn" id="genBtn">Generate</button>
+          <button class="btn secondary" id="copyBtn">Copy</button>
+          <span class="copy-toast" id="copyToast">Copied</span>
+        </div>
+        <pre id="output" spellcheck="false"></pre>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="card">
+      <div class="row" style="justify-content: space-between;">
+        <h2 style="margin:0;">IP entities</h2>
+        <div class="toolbar">
+          <span class="pill">Add multiple IP blocks as needed</span>
+          <button id="addIpBtn" type="button" class="btn">Add IP</button>
+        </div>
+      </div>
+      <div id="ipWrap" class="list" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="grid">
+      <div class="card">
+        <h2>Conclusion</h2>
+        <div class="field">
+          <label>CONCOLUSION</label>
+          <textarea id="conclusion" placeholder="Key takeaway, mitigations, next steps..."></textarea>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Threat assessment</h2>
+        <div class="row">
+          <label class="toggle muted"><input type="radio" name="threat" value="no" checked /> NO threat</label>
+          <label class="toggle muted"><input type="radio" name="threat" value="yes" /> THREAT, T2 PLEASE INVISTIGATE</label>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+
