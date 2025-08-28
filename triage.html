@@ -385,7 +385,7 @@
       lines.push(`User: ${userId} / ${userEmail}`);
 
       const anomalies = document.getElementById('anomaliesToggle').checked;
-      const anomalyNames = document.getElementById('anomalyNames').value.trim();
+      const anomalyNames = document.getElementById('anomalyNames')?.value?.trim() || '';
       if (anomalies) {
         lines.push(`- Logs: ${anomalyNames || 'anomalies'}`);
       } else {
