@@ -120,6 +120,17 @@
     pre#output { width: 100%; background: #0a1122; border: 1px solid var(--border); color: var(--text); padding: 12px; border-radius: 8px; min-height: 180px; white-space: pre-wrap; word-wrap: break-word; }
     .copy-toast { font-size: 12px; color: var(--accent-2); opacity: 0; transition: opacity 0.2s ease; }
     .copy-toast.show { opacity: 1; }
+    .tabs { display: flex; gap: 8px; margin: 10px 0 16px; }
+    .tab-btn {
+      background: var(--chip);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .tab-btn.active { background: var(--accent); border-color: #2a2aa8; color: #fff; }
   </style>
   <script>
     function uid() { return Math.random().toString(36).slice(2, 9); }
@@ -373,8 +384,17 @@
       appsCard.appendChild(appsTitle); appsCard.appendChild(appsList); appsCard.appendChild(appsAdd);
       card.appendChild(appsCard);
 
+      // Additional IP free-text lines
+      const extraCard = document.createElement('div'); extraCard.className = 'card';
+      const extraTitle = document.createElement('h3'); extraTitle.textContent = 'Additional IP lines'; extraTitle.style.margin = '0 0 8px'; extraTitle.style.fontSize='14px';
+      const ipExtraList = document.createElement('div'); ipExtraList.className = 'list ip-extra-lines';
+      const ipExtraAdd = document.createElement('button'); ipExtraAdd.type = 'button'; ipExtraAdd.className = 'btn small secondary'; ipExtraAdd.textContent = 'Add line';
+      ipExtraAdd.addEventListener('click', () => ipExtraList.appendChild(makeListItem({ withToggle: true, toggleLabel: '-', placeholder: 'Additional IP note' })));
+      extraCard.appendChild(extraTitle); extraCard.appendChild(ipExtraList); extraCard.appendChild(ipExtraAdd);
+      card.appendChild(extraCard);
+
       // Attach references for generation
-      card._refs = { iIp, iCc, iOwner, newIpCb, newLocCb, mfaOptions, mfaMethodsList, vpnCb, vpnHistCb, vpnHistDetail, abuseCb, abuseWhenField, authList, iRes, iBr, brSeen, iOs, osSeen, iUa, iDev, appsList };
+      card._refs = { iIp, iCc, iOwner, newIpCb, newLocCb, mfaOptions, mfaMethodsList, vpnCb, vpnHistCb, vpnHistDetail, abuseCb, abuseWhenField, authList, iRes, iBr, brSeen, iOs, osSeen, iUa, iDev, appsList, ipExtraList };
       // Seed one row for MFA/Auth/Apps
       addMfaMethod(card);
       addAuthMethod(card);
@@ -384,11 +404,14 @@
     }
 
     function renumberIpCards() {
-      const cards = document.querySelectorAll('.ip-card');
-      cards.forEach((c, i) => {
-        c.dataset.index = String(i + 1);
-        const badge = c.querySelector('.ip-badge');
-        if (badge) badge.textContent = `IP ${i + 1}`;
+      const wrappers = [document.getElementById('ipWrap'), document.getElementById('ipWrapAction')].filter(Boolean);
+      wrappers.forEach((wrap) => {
+        const cards = Array.from(wrap.querySelectorAll('.ip-card'));
+        cards.forEach((c, i) => {
+          c.dataset.index = String(i + 1);
+          const badge = c.querySelector('.ip-badge');
+          if (badge) badge.textContent = `IP ${i + 1}`;
+        });
       });
     }
 
@@ -402,36 +425,75 @@
 
     function generateOutput() {
       const lines = [];
+      const activeTab = window.currentTab || 'signin';
       lines.push('[What happened]');
-      const what = document.getElementById('whatHappened').value.trim();
+      const what = (activeTab === 'signin' ? document.getElementById('whatHappened') : document.getElementById('whatHappenedAction'))?.value?.trim() || '';
       if (what) lines.push(what);
 
-      const userId = document.getElementById('userId').value.trim();
-      const userEmail = document.getElementById('userEmail').value.trim();
-      lines.push(`User: ${userId} / ${userEmail}`);
+      if (activeTab === 'signin') {
+        const userId = document.getElementById('userId').value.trim();
+        const userEmail = document.getElementById('userEmail').value.trim();
+        lines.push(`User: ${userId} / ${userEmail}`);
 
-      // user extra lines
-      const userExtraList = document.getElementById('userExtraList');
-      if (userExtraList) {
-        const extras = collectListTexts(userExtraList);
-        extras.forEach(e => {
-          if (e.text) lines.push(`${e.checked ? '- ' : ''}${e.text}`);
-        });
-      }
+        // user extra lines
+        const userExtraList = document.getElementById('userExtraList');
+        if (userExtraList) {
+          const extras = collectListTexts(userExtraList);
+          extras.forEach(e => {
+            if (e.text) lines.push(`${e.checked ? '- ' : ''}${e.text}`);
+          });
+        }
 
-      const anomalies = document.getElementById('anomaliesToggle').checked;
-      const anomalyNames = document.querySelector('#anomalyNames input')?.value?.trim() || '';
-      if (anomalies) {
-        lines.push(`- Logs: ${anomalyNames || 'anomalies'}`);
+        const anomalies = document.getElementById('anomaliesToggle').checked;
+        const anomalyNames = document.querySelector('#anomalyNames input')?.value?.trim() || '';
+        if (anomalies) {
+          lines.push(`- Logs: ${anomalyNames || 'anomalies'}`);
+        } else {
+          lines.push('- Logs: no anomalies');
+        }
       } else {
-        lines.push('- Logs: no anomalies');
+        // Action-based
+        const initId = document.getElementById('initId').value.trim();
+        const initEmail = document.getElementById('initEmail').value.trim();
+        lines.push(`Initiator: ${initId} / ${initEmail}`);
+
+        const hasBefore = document.getElementById('initHasBefore').checked;
+        const hasBeforeDetail = document.getElementById('initHasBeforeDetail').value.trim();
+        if (hasBefore) lines.push(`- Initiator has done this before${hasBeforeDetail ? ' ; details: ' + hasBeforeDetail : ''}`);
+
+        const initExtraList = document.getElementById('initExtraList');
+        if (initExtraList) {
+          const extras = collectListTexts(initExtraList);
+          extras.forEach(e => { if (e.text) lines.push(`${e.checked ? '- ' : ''}${e.text}`); });
+        }
+
+        const initAnom = document.getElementById('initAnomaliesToggle').checked;
+        const initAnomNames = document.querySelector('#initAnomalyNames input')?.value?.trim() || '';
+        lines.push(initAnom ? `- Initiator logs: ${initAnomNames || 'anomalies'}` : '- Initiator logs: no anomalies');
+
+        lines.push('');
+
+        const targetId = document.getElementById('targetId').value.trim();
+        const targetInfo = document.getElementById('targetInfo').value.trim();
+        lines.push(`Target: ${targetId}${targetInfo ? ' / ' + targetInfo : ''}`);
+
+        const targetExtraList = document.getElementById('targetExtraList');
+        if (targetExtraList) {
+          const extras = collectListTexts(targetExtraList);
+          extras.forEach(e => { if (e.text) lines.push(`${e.checked ? '- ' : ''}${e.text}`); });
+        }
+
+        const targetAnom = document.getElementById('targetAnomaliesToggle').checked;
+        const targetAnomNames = document.querySelector('#targetAnomalyNames input')?.value?.trim() || '';
+        lines.push(targetAnom ? `- Target logs: ${targetAnomNames || 'anomalies'}` : '- Target logs: no anomalies');
       }
 
-      // separation between user and IP parts
+      // separation between entities and IP parts
       lines.push('');
       lines.push('');
 
-      const ipCards = Array.from(document.querySelectorAll('.ip-card'));
+      const ipScope = activeTab === 'signin' ? document.getElementById('ipWrap') : document.getElementById('ipWrapAction');
+      const ipCards = Array.from(ipScope.querySelectorAll('.ip-card'));
       ipCards.forEach((card, idx) => {
         if (idx > 0) { lines.push(''); lines.push(''); }
         const r = card._refs;
@@ -535,11 +597,60 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      // Tabs state and handlers
+      window.currentTab = 'signin';
+      const tabSignin = document.getElementById('tabSignin');
+      const tabAction = document.getElementById('tabAction');
+      const overviewSignin = document.getElementById('overviewSignin');
+      const overviewAction = document.getElementById('overviewAction');
+      const ipSectionSignin = document.getElementById('ipSectionSignin');
+      const ipSectionAction = document.getElementById('ipSectionAction');
+      function setTab(tab) {
+        window.currentTab = tab;
+        if (tab === 'signin') {
+          tabSignin?.classList.add('active'); tabAction?.classList.remove('active');
+          if (overviewSignin) overviewSignin.style.display = 'block';
+          if (overviewAction) overviewAction.style.display = 'none';
+          if (ipSectionSignin) ipSectionSignin.style.display = 'block';
+          if (ipSectionAction) ipSectionAction.style.display = 'none';
+        } else {
+          tabAction?.classList.add('active'); tabSignin?.classList.remove('active');
+          if (overviewSignin) overviewSignin.style.display = 'none';
+          if (overviewAction) overviewAction.style.display = 'block';
+          if (ipSectionSignin) ipSectionSignin.style.display = 'none';
+          if (ipSectionAction) ipSectionAction.style.display = 'block';
+          // seed an IP for action tab if empty
+          const wrapAction = document.getElementById('ipWrapAction');
+          if (wrapAction && !wrapAction.children.length) {
+            wrapAction.appendChild(makeIpCard(1));
+            renumberIpCards();
+          }
+        }
+      }
+      tabSignin?.addEventListener('click', () => setTab('signin'));
+      tabAction?.addEventListener('click', () => setTab('action'));
+
       document.getElementById('addIpBtn').addEventListener('click', addIp);
+      document.getElementById('addIpBtnAction')?.addEventListener('click', () => {
+        const wrap = document.getElementById('ipWrapAction');
+        if (wrap) { wrap.appendChild(makeIpCard(wrap.children.length + 1)); renumberIpCards(); }
+      });
       document.getElementById('genBtn').addEventListener('click', generateOutput);
       document.getElementById('copyBtn').addEventListener('click', copyOutput);
       document.getElementById('anomaliesToggle').addEventListener('change', (e) => {
         document.getElementById('anomalyNames').style.display = e.target.checked ? 'block' : 'none';
+      });
+      document.getElementById('initAnomaliesToggle')?.addEventListener('change', (e) => {
+        const names = document.getElementById('initAnomalyNames');
+        if (names) names.style.display = e.target.checked ? 'block' : 'none';
+      });
+      document.getElementById('targetAnomaliesToggle')?.addEventListener('change', (e) => {
+        const names = document.getElementById('targetAnomalyNames');
+        if (names) names.style.display = e.target.checked ? 'block' : 'none';
+      });
+      document.getElementById('initHasBefore')?.addEventListener('change', (e) => {
+        const detail = document.getElementById('initHasBeforeDetail');
+        if (detail) detail.style.display = e.target.checked ? 'inline-block' : 'none';
       });
       const addUserExtraBtn = document.getElementById('addUserExtraBtn');
       if (addUserExtraBtn) {
@@ -548,8 +659,17 @@
           if (list) list.appendChild(makeListItem({ withToggle: true, toggleLabel: '-', placeholder: 'Additional user note' }));
         });
       }
+      document.getElementById('addInitExtraBtn')?.addEventListener('click', () => {
+        const list = document.getElementById('initExtraList');
+        if (list) list.appendChild(makeListItem({ withToggle: true, toggleLabel: '-', placeholder: 'Additional initiator note' }));
+      });
+      document.getElementById('addTargetExtraBtn')?.addEventListener('click', () => {
+        const list = document.getElementById('targetExtraList');
+        if (list) list.appendChild(makeListItem({ withToggle: true, toggleLabel: '-', placeholder: 'Additional target note' }));
+      });
       // seed one IP card
       addIp();
+      setTab('signin');
     });
   </script>
   <!--
@@ -565,8 +685,13 @@
     <h1>Triage Builder</h1>
     <div class="subtext">Fill the form, then Generate and Copy the triage. Add multiple IP entities as needed.</div>
 
+    <div class="tabs">
+      <button id="tabSignin" type="button" class="tab-btn active">Sign-in incidents</button>
+      <button id="tabAction" type="button" class="tab-btn">Action-based incidents</button>
+    </div>
+
     <div class="grid">
-      <div class="card">
+      <div id="overviewSignin" class="card" style="display:block;">
         <h2>Overview</h2>
         <div class="field">
           <label>What happened</label>
@@ -596,6 +721,64 @@
         </div>
       </div>
 
+      <div id="overviewAction" class="card" style="display:none;">
+        <h2>Overview (Action-based)</h2>
+        <div class="field">
+          <label>What happened</label>
+          <textarea id="whatHappenedAction" placeholder="Summarize the incident context and actions..."></textarea>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Initiator ID</label>
+            <input type="text" id="initId" placeholder="e.g., 12345" />
+          </div>
+          <div class="field">
+            <label>Initiator Email</label>
+            <input type="email" id="initEmail" placeholder="e.g., user@example.com" />
+          </div>
+        </div>
+        <div class="row">
+          <label class="toggle muted"><input id="initHasBefore" type="checkbox" /> Has he done this before</label>
+          <input id="initHasBeforeDetail" type="text" placeholder="details (optional)" style="display:none; min-width:220px;" />
+        </div>
+        <div class="card" style="margin-top:10px;">
+          <h3 style="margin:0 0 8px; font-size:14px;">Additional initiator lines</h3>
+          <div id="initExtraList" class="list"></div>
+          <button id="addInitExtraBtn" type="button" class="btn small secondary">Add line</button>
+        </div>
+        <div class="row">
+          <label class="toggle muted"><input id="initAnomaliesToggle" type="checkbox" /> Initiator anomalies present</label>
+        </div>
+        <div class="field" id="initAnomalyNames" style="display:none; margin-top:6px;">
+          <label>List initiator anomalies (free text)</label>
+          <input type="text" placeholder="e.g., Multiple failed actions; Suspicious patterns" />
+        </div>
+
+        <div class="divider" style="margin:12px 0;"></div>
+
+        <div class="row">
+          <div class="field">
+            <label>Target ID</label>
+            <input type="text" id="targetId" placeholder="e.g., Resource123" />
+          </div>
+          <div class="field">
+            <label>Target info (free text)</label>
+            <input type="text" id="targetInfo" placeholder="e.g., File, Account, Service" />
+          </div>
+        </div>
+        <div class="card" style="margin-top:10px;">
+          <h3 style="margin:0 0 8px; font-size:14px;">Additional target lines</h3>
+          <div id="targetExtraList" class="list"></div>
+          <button id="addTargetExtraBtn" type="button" class="btn small secondary">Add line</button>
+        </div>
+        <div class="row">
+          <label class="toggle muted"><input id="targetAnomaliesToggle" type="checkbox" /> Target anomalies present</label>
+        </div>
+        <div class="field" id="targetAnomalyNames" style="display:none; margin-top:6px;">
+          <label>List target anomalies (free text)</label>
+          <input type="text" placeholder="e.g., Access spikes; Policy violations" />
+        </div>
+      </div>
       <div class="card">
         <h2>Output</h2>
         <div class="toolbar" style="margin-bottom:10px;">
@@ -608,7 +791,7 @@
     </div>
 
     <div class="divider"></div>
-    <div class="card">
+    <div id="ipSectionSignin" class="card" style="display:block;">
       <div class="row" style="justify-content: space-between;">
         <h2 style="margin:0;">IP entities</h2>
         <div class="toolbar">
@@ -617,6 +800,17 @@
         </div>
       </div>
       <div id="ipWrap" class="list" style="margin-top:12px;"></div>
+    </div>
+
+    <div id="ipSectionAction" class="card" style="display:none;">
+      <div class="row" style="justify-content: space-between;">
+        <h2 style="margin:0;">IP entities</h2>
+        <div class="toolbar">
+          <span class="pill">Add multiple IP blocks as needed</span>
+          <button id="addIpBtnAction" type="button" class="btn">Add IP</button>
+        </div>
+      </div>
+      <div id="ipWrapAction" class="list" style="margin-top:12px;"></div>
     </div>
 
     <div class="divider"></div>
