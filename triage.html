@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -428,7 +429,10 @@
       const activeTab = window.currentTab || 'signin';
       lines.push('[What happened]');
       const what = (activeTab === 'signin' ? document.getElementById('whatHappened') : document.getElementById('whatHappenedAction'))?.value?.trim() || '';
-      if (what) lines.push(what);
+      if (what) {
+        lines.push(what);
+        lines.push(''); 
+      }
 
       if (activeTab === 'signin') {
         const userId = document.getElementById('userId').value.trim();
@@ -536,12 +540,16 @@
         lines.push(`- result Type: ${resultType || '0'}`);
 
         const browser = r.iBr.value.trim();
-        const brSeen = r.brSeen.checked ? 'seen' : 'no seen';
-        lines.push(`- Browser: ${browser}${browser ? ' ' : ''}(${brSeen})`);
+        if (browser) {
+          const brSeen = r.brSeen.checked ? 'seen' : 'no seen';
+          lines.push(`- Browser: ${browser} (${brSeen})`);
+        }
 
         const os = r.iOs.value.trim();
-        const osSeen = r.osSeen.checked ? 'seen' : 'no seen';
-        lines.push(`- OS: ${os}${os ? ' ' : ''}(${osSeen})`);
+        if (os) {
+          const osSeen = r.osSeen.checked ? 'seen' : 'no seen';
+          lines.push(`- OS: ${os} (${osSeen})`);
+        }
 
         // UA and Device ID if available
         const ua = r.iUa?.value?.trim() || '';
@@ -564,6 +572,14 @@
             lines.push(`${a.name}${a.name ? ' ' : ''}(${seenStr})${a.seen && a.when ? ' , when: ' + a.when : ''}`);
           });
         }
+        
+        const ipExtraList = r.ipExtraList;
+        if (ipExtraList) {
+          const extras = collectListTexts(ipExtraList);
+          extras.forEach(e => {
+            if (e.text) lines.push(`${e.checked ? '- ' : ''}${e.text}`);
+          });
+        }
       });
 
       const conclusion = document.getElementById('conclusion').value.trim();
@@ -575,7 +591,13 @@
 
       const threat = document.querySelector('input[name="threat"]:checked')?.value || 'no';
       lines.push('');
-      lines.push(threat === 'yes' ? '[THREAT, T2 PLEASE INVISTIGATE]' : 'NO threat.');
+      if (threat === 'verify') {
+        lines.push('T2 please verify');
+      } else if (threat === 'investigate') {
+        lines.push('T2 please investigate further more');
+      } else {
+        lines.push('No threat.');
+      }
 
       document.getElementById('output').textContent = lines.join('\n');
     }
@@ -824,13 +846,13 @@
       </div>
       <div class="card">
         <h2>Threat assessment</h2>
-        <div class="row">
-          <label class="toggle muted"><input type="radio" name="threat" value="no" checked /> NO threat</label>
-          <label class="toggle muted"><input type="radio" name="threat" value="yes" /> THREAT, T2 PLEASE INVISTIGATE</label>
+        <div class="row" style="flex-direction: column; align-items: flex-start; gap: 10px;">
+          <label class="toggle muted"><input type="radio" name="threat" value="no" checked /> No threat</label>
+          <label class="toggle muted"><input type="radio" name="threat" value="verify" /> T2 please verify</label>
+          <label class="toggle muted"><input type="radio" name="threat" value="investigate" /> T2 please investigate further more</label>
         </div>
       </div>
     </div>
   </div>
 </body>
 </html>
-
