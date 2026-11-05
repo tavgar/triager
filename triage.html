@@ -271,7 +271,7 @@
       const mfaField = document.createElement('div'); mfaField.className = 'field';
       const mfaLabel = document.createElement('label'); mfaLabel.textContent = 'MFA status';
       const mfaOptions = document.createElement('div'); mfaOptions.className = 'row';
-      const statuses = [ ['VALID','valid'], ['NO MFA','no_mfa'], ['NOT VALID','not_valid'] ];
+      const statuses = [ ['VALID','valid'], ['NO VALID MFA','no_mfa'], ['NOT VALID','not_valid'] ];
       const mfaGroup = `mfa-${idx}-${uid()}`; // same group per IP
       statuses.forEach(([label, value]) => {
         const wrap = document.createElement('label'); wrap.className = 'toggle muted';
@@ -387,10 +387,15 @@
 
       // Additional IP free-text lines
       const extraCard = document.createElement('div'); extraCard.className = 'card';
-      const extraTitle = document.createElement('h3'); extraTitle.textContent = 'Additional IP lines'; extraTitle.style.margin = '0 0 8px'; extraTitle.style.fontSize='14px';
+      const extraTitle = document.createElement('h3'); extraTitle.textContent = 'Additional IP lines'; extraTitle.style.margin = '0 0 8px'; extraTitle.style.fontSize = '14px';
       const ipExtraList = document.createElement('div'); ipExtraList.className = 'list ip-extra-lines';
       const ipExtraAdd = document.createElement('button'); ipExtraAdd.type = 'button'; ipExtraAdd.className = 'btn small secondary'; ipExtraAdd.textContent = 'Add line';
-      ipExtraAdd.addEventListener('click', () => ipExtraList.appendChild(makeListItem({ withToggle: true, toggleLabel: '-', placeholder: 'Additional IP note' })));
+      ipExtraAdd.addEventListener('click', () => {
+        const item = makeListItem({ withToggle: true, toggleLabel: '-', placeholder: 'Additional IP note' });
+        const checkbox = item.querySelector('input[type="checkbox"]');
+        if (checkbox) checkbox.checked = true; // ✅ Set checkbox checked by default
+        ipExtraList.appendChild(item);
+      });
       extraCard.appendChild(extraTitle); extraCard.appendChild(ipExtraList); extraCard.appendChild(ipExtraAdd);
       card.appendChild(extraCard);
 
@@ -427,7 +432,6 @@
     function generateOutput() {
       const lines = [];
       const activeTab = window.currentTab || 'signin';
-      lines.push('[What happened]');
       const what = (activeTab === 'signin' ? document.getElementById('whatHappened') : document.getElementById('whatHappenedAction'))?.value?.trim() || '';
       if (what) {
         lines.push(what);
@@ -494,7 +498,6 @@
 
       // separation between entities and IP parts
       lines.push('');
-      lines.push('');
 
       const ipScope = activeTab === 'signin' ? document.getElementById('ipWrap') : document.getElementById('ipWrapAction');
       const ipCards = Array.from(ipScope.querySelectorAll('.ip-card'));
@@ -506,7 +509,7 @@
         const cc = r.iCc.value.trim();
         const owner = r.iOwner.value.trim();
         const selectedMfa = Array.from(r.mfaOptions.querySelectorAll('input[type="radio"]')).find(x => x.checked)?.value || 'no_mfa';
-        const mfaStatus = selectedMfa === 'valid' ? 'VALID' : selectedMfa === 'not_valid' ? 'NOT VALID' : 'NO MFA';
+        const mfaStatus = selectedMfa === 'valid' ? 'VALID' : selectedMfa === 'not_valid' ? 'NOT VALID' : 'NO VALID MFA';
         const mfaMethods = collectListTexts(r.mfaMethodsList).map(x => x.text).filter(Boolean);
 
         lines.push(`${label} ${ip}${cc ? ' [' + cc + ']' : ''}`);
@@ -518,7 +521,6 @@
         if (r.newLocCb && r.newLocCb.checked) lines.push('- New location');
 
         if (r.vpnCb.checked) {
-          lines.push('- VPN: YES');
           if (r.vpnHistCb.checked) {
             const detail = r.vpnHistDetail.value.trim();
             lines.push(`- History of VPN usage${detail ? ': ' + detail : ''}`);
@@ -533,7 +535,7 @@
         const auths = collectListTexts(r.authList);
         if (auths.length) {
           lines.push('- [Auth methods]:');
-          auths.forEach(a => lines.push(`${a.text} ${a.checked ? 'true' : 'false'}`));
+          auths.forEach(a => lines.push(`${a.text} ${a.checked ? '- true' : '- false'}`));
         }
 
         const resultType = r.iRes.value.trim();
@@ -585,7 +587,6 @@
       const conclusion = document.getElementById('conclusion').value.trim();
       if (conclusion) {
         lines.push('');
-        lines.push('[CONCLUSION]');
         lines.push(conclusion);
       }
 
