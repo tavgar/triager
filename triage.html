@@ -185,6 +185,11 @@
     .switch input:checked + span { background: var(--secondary); color: var(--text); }
     .switch input[value="seen"]:checked + span { background: var(--ok-tint); color: var(--ok); }
     .switch input[value="not seen"]:checked + span { background: var(--danger-tint); color: var(--danger); }
+    .switch input[value="Known"]:checked + span,
+    .switch input[value="Known range"]:checked + span,
+    .switch input[value="Seen recently"]:checked + span { background: var(--ok-tint); color: var(--ok); }
+    .field > .switch { align-self: flex-start; }
+    .switch input[value="New"]:checked + span { background: var(--danger-tint); color: var(--danger); }
     .switch input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: -2px; }
 
     /* Output */
@@ -411,6 +416,15 @@
       row1.appendChild(fIp); row1.appendChild(fCc); row1.appendChild(fVpn);
       card.appendChild(row1);
 
+      // IP status: Neutral adds nothing; the others add their label after the IP
+      const rowIpStatus = document.createElement('div'); rowIpStatus.className = 'row';
+      const fIpStatus = document.createElement('div'); fIpStatus.className = 'field';
+      const lIpStatus = document.createElement('label'); lIpStatus.textContent = 'IP status';
+      const ipStatus = makeSwitch('IP status', [['', 'Neutral'], ['Known', 'Known'], ['Known range', 'Known range'], ['Seen recently', 'Seen recently'], ['New', 'New']], '');
+      fIpStatus.appendChild(lIpStatus); fIpStatus.appendChild(ipStatus);
+      rowIpStatus.appendChild(fIpStatus);
+      card.appendChild(rowIpStatus);
+
       const rowOwner = document.createElement('div');
       rowOwner.className = 'row';
       const fOwner = document.createElement('div'); fOwner.className = 'field';
@@ -564,7 +578,7 @@
       card.appendChild(extraCard);
 
       // Attach references for generation
-      card._refs = { iIp, iCc, iVpn, iOwner, newIpCb, newLocCb, mfaMethodsList, iVpnHist, abuseCb, abuseWhenField, authList, iRes, iBr, brSeen, iOs, osSeen, iUa, iDev, devSeen, appsList, ipExtraList };
+      card._refs = { iIp, ipStatus, iCc, iVpn, iOwner, newIpCb, newLocCb, mfaMethodsList, iVpnHist, abuseCb, abuseWhenField, authList, iRes, iBr, brSeen, iOs, osSeen, iUa, iDev, devSeen, appsList, ipExtraList };
       // Seed one row for MFA/Auth/Apps/Additional lines
       addMfaMethod(card);
       addAuthMethod(card);
@@ -647,7 +661,8 @@
         }).filter(Boolean);
         const mfaStatus = mfaMethods.length ? 'VALID' : 'NO VALID MFA';
 
-        lines.push(`${label} ${ip}${ipTag ? ' [' + ipTag + ']' : ''}`);
+        const ipStatusText = ip && switchValue(r.ipStatus) ? ` (${switchValue(r.ipStatus)})` : '';
+        lines.push(`${label} ${ip}${ipStatusText}${ipTag ? ' [' + ipTag + ']' : ''}`);
         lines.push(`- Owned by ${owner}`);
         lines.push(`- MFA: ${mfaStatus}${mfaMethods.length ? '; ' + mfaMethods.join(', ') : ''}`);
 
@@ -798,6 +813,7 @@
     - The two "What happened" checkboxes (one at a time) write a sentence using the email (or the ID if no email) and the IP addresses.
     - "abuse" is omitted unless detected.
     - VPN name is added to the IP line only when filled.
+    - The IP has a Neutral / Known / Known range / Seen recently / New switch; Neutral (default) adds nothing.
     - VPN history is disabled until a VPN name is entered, and its line only appears when both are filled.
   -->
 </head>
